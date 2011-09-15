@@ -1,0 +1,14 @@
+(
+
+:server-root "/home/jac/dist"
+:server-cmd "bin/server.sh"
+
+:use-sbt t
+:sbt-compile-conf "compile"
+:sbt-runtime-conf "runtime"
+
+:project-package "com.ensime"
+:debug-class "com.ensime.server.Server"
+:debug-args ("/tmp/ensime_port.tmp")
+
+)

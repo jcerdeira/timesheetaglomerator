@@ -1,56 +1,91 @@
 package org.realsoftwarematters.timesheetaglomerator
 
-import org.apache.poi.hssf.usermodel.{ HSSFWorkbook }
-import org.apache.poi.poifs.filesystem.POIFSFileSystem
-import org.apache.poi.hssf.extractor.ExcelExtractor
-import org.apache.poi.ss.usermodel.{ Cell, Row, Sheet, DateUtil }
-
+import jxl.{ Workbook, Sheet, Cell, CellType, DateCell, NumberCell, DateFormulaCell, NumberFormulaCell }
 import java.io.{ FileInputStream, File }
 import java.util.{ Calendar }
-
 import collection.JavaConversions._
 import collection.mutable._
-
 import java.lang.reflect.{ Field }
+import sun.font.EAttribute
+import sun.font.EAttribute
 
 object TimeSheetAglomerator {
 
   def main(args: Array[String]) = {
 
+    //      println((0 to 20).toList.map( i => extractValues(doc.getSheet("Fevereiro").getCell(1,i))))
+
+    var data: Map[String, List[MonthHours]] = Map()
+
     for (file <- new File("excels").listFiles) {
-      val sheet = new HSSFWorkbook(new POIFSFileSystem(new FileInputStream(file))).getSheet("TimeSheet")
-      println(processSheet(sheet))
+
+      val doc = Workbook.getWorkbook(file)
+
+      println(file.getName())
+
+      if (!doc.getSheetNames().contains("TimeSheet")) {
+
+        doc.getSheetNames().map { sheetName =>
+          println("Sheet Name: " + sheetName)
+          processSheet(doc.getSheet(sheetName), extractHeadersYear)
+        }.foreach { it =>
+          val (year, monthHours) = it
+          data = addMore(data,year, monthHours)
+        }
+
+      } else {
+
+        val (year, monthHours) = processSheet(Workbook.getWorkbook(file).getSheet("TimeSheet"), extractHeadersMonth)
+          data = addMore(data,year, monthHours)
+      }
     }
+    println(data)
 
   }
-
-  def printRow(row: Row) = {
-
-    row.cellIterator foreach { cell => print("index: %s value: [%s] " format (cell.getColumnIndex(), extractValues(cell))) }
-
+  
+  def addMore(data : Map[String, List[MonthHours]], year:String, monthHours:MonthHours) :  Map[String, List[MonthHours]] = {
+ 
+    if (!data.contains(year))
+    	data + (year -> List(monthHours))
+    else
+      data + ( year -> (data(year) ++ List(monthHours)))
+    
   }
 
-  def processSheet(sheet: Sheet): (String, MonthHours) = {
-    val headers = extractHeaders(sheet)
-    headers.year -> MonthHours(headers.month, extractMonthValues(headers, extractProjects(sheet), extractActivities(sheet.getRow(6)), sheet))
+  def printLine(sheet: Sheet, pos: Integer) = {
+
+    (0 to 20).toList.map(i => print(" " + extractValues(sheet.getCell(i, pos)) + " "))
+    println
+  }
+
+  def processSheet(sheet: Sheet, f: Sheet => HeaderSheet): (String, MonthHours) = {
+    val headers = f(sheet)
+    headers.year -> MonthHours(headers.month, extractMonthValues(headers, extractProjects(sheet), extractActivities(sheet, 6), sheet))
   }
 
   def extractMonthValues(headers: HeaderSheet, projects: List[IndexLegenda], activities: List[IndexLegenda], sheet: Sheet): List[ProjectHours] = {
     projects map {
       project =>
-        ProjectHours(project.value, extractMonthProjectValues(sheet.getRow(project.pos), activities))
+        ProjectHours(project.value, extractMonthProjectValues(sheet, project.pos, activities))
     }
   }
 
-  def extractMonthProjectValues(row: Row, activities: List[IndexLegenda]): scala.collection.immutable.Map[String, Double] = {
-    activities map (
+  def extractMonthProjectValues(sheet: Sheet, nrow: Integer, activities: List[IndexLegenda]): scala.collection.immutable.Map[String, Double] = {
+    activities map {
       activity =>
-        activity.value -> extractValues(row.getCell(activity.pos)).asInstanceOf[Double]) toMap
+        activity.value -> extractValues(sheet.getCell(activity.pos, nrow)).asInstanceOf[Double]
+    } toMap
   }
 
-  def extractHeaders(sheet: Sheet): HeaderSheet = {
+  def extractHeadersYear(sheet: Sheet): HeaderSheet = {
+    val Name = """(.+) / (\d+)""".r
+    val Name(month, year) = extractValues(sheet.getCell(9, 1))
+    HeaderSheet(translateMonth(month), year)
+  }
+
+  def extractHeadersMonth(sheet: Sheet): HeaderSheet = {
     val cal = Calendar.getInstance
-    cal.setTime(extractValues(sheet.getRow(1).getCell(16)).asInstanceOf[java.util.Date])
+    cal.setTime(extractValues(sheet.getCell(16, 1)).asInstanceOf[java.util.Date])
     HeaderSheet(monthName(cal.get(Calendar.MONTH)), cal.get(Calendar.YEAR).toString())
   }
 
@@ -64,6 +99,7 @@ object TimeSheetAglomerator {
       case Calendar.JUNE => "Junho"
       case Calendar.JULY => "Julho"
       case Calendar.AUGUST => "Agosto"
+      case Calendar.SEPTEMBER => "Setembro"
       case Calendar.OCTOBER => "Outubro"
       case Calendar.NOVEMBER => "Novembro"
       case Calendar.DECEMBER => "Dezembro"
@@ -73,34 +109,54 @@ object TimeSheetAglomerator {
   def extractProjects(sheet: Sheet): List[IndexLegenda] = {
 
     var indexeslegend = List[IndexLegenda]()
-    var i = 7; var value = "test"
+    var i = 7
     do {
-      value = extractValues(sheet.getRow(i).getCell(1)).asInstanceOf[java.lang.String]
+      val value = extractValues(sheet.getCell(1, i)).asInstanceOf[java.lang.String]
       indexeslegend = indexeslegend ::: List(new IndexLegenda(value = value, pos = i))
       i = i + 1
-    } while ((i < 21) && ((extractValues(sheet.getRow(i).getCell(1)).asInstanceOf[java.lang.String]).size != 1))
+    } while ((i < 21) && ((extractValues(sheet.getCell(1, i)).asInstanceOf[java.lang.String]).size != 1))
 
     indexeslegend
   }
 
-  def extractActivities(row: Row): List[IndexLegenda] = {
+  def extractActivities(sheet: Sheet, nrow: Integer): List[IndexLegenda] = {
 
     var indexeslegend = List[IndexLegenda]()
     for (i <- 2 to 18) {
-      if (extractValues(row.getCell(i)).asInstanceOf[String] != "") indexeslegend = indexeslegend ::: List(new IndexLegenda(value = row.getCell(i).toString, pos = i))
+      val activity = extractValues(sheet.getCell(i, nrow)).asInstanceOf[String]
+      if (activity != "") {
+        indexeslegend = indexeslegend ::: List(new IndexLegenda(value = translateActivity(activity), pos = i))
+      }
     }
     indexeslegend
+  }
+
+  def translateMonth(month: String) = month match {
+    case "Mar�o" => "Março"
+    case _ => month
+  }
+
+  def translateActivity(activity: String) = activity match {
+    case "Forma��" => "Formação"
+    case "Integra��" => "Integração"
+    case "Documenta��" => "Documentação"
+    case "Reuni�es Externas" => "Reuniões Externas"
+    case "Reuni�es Internas" => "Reuniões Internas"
+    case "Investiga��" => "Investigação"
+    case _ => activity
   }
 
   def extractValues(cell: Cell): Any = {
 
-    cell.getCellType match {
-      case Cell.CELL_TYPE_NUMERIC =>
-        if (DateUtil.isCellDateFormatted(cell)) { cell.getDateCellValue }
-        else { cell.getNumericCellValue }
-      case Cell.CELL_TYPE_BLANK => ""
-      case _ => cell.getStringCellValue
+    cell.getType() match {
+      case CellType.NUMBER => cell.asInstanceOf[NumberCell].getValue()
+      case CellType.DATE => cell.asInstanceOf[DateCell].getDate
+      case CellType.DATE_FORMULA => cell.asInstanceOf[DateFormulaCell].getDate()
+      case CellType.NUMBER_FORMULA => cell.asInstanceOf[NumberFormulaCell].getValue()
+      case CellType.STRING_FORMULA => cell.getContents
+      case _ => cell.getContents
     }
+
   }
 
 }
@@ -125,7 +181,7 @@ case class HeaderSheet(val month: String, val year: String) {
 
 }
 
-case class IndexLegenda(val value: String, val pos: Int) {
+case class IndexLegenda(val value: String, val pos: Integer) {
 
   override def toString() = {
     getClass().getDeclaredFields().map { field: Field =>

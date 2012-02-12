@@ -30,26 +30,24 @@ object TimeSheetAglomerator {
           processSheet(doc.getSheet(sheetName), extractHeadersYear)
         }.foreach { it =>
           val (year, monthHours) = it
-          data = addMore(data,year, monthHours)
+          data = addMore(data, year, monthHours)
         }
-
       } else {
-
         val (year, monthHours) = processSheet(Workbook.getWorkbook(file).getSheet("TimeSheet"), extractHeadersMonth)
-          data = addMore(data,year, monthHours)
+        data = addMore(data, year, monthHours)
       }
     }
     println(data)
 
   }
-  
-  def addMore(data : Map[String, List[MonthHours]], year:String, monthHours:MonthHours) :  Map[String, List[MonthHours]] = {
- 
+
+  def addMore(data: Map[String, List[MonthHours]], year: String, monthHours: MonthHours): Map[String, List[MonthHours]] = {
+
     if (!data.contains(year))
-    	data + (year -> List(monthHours))
+      data + (year -> List(monthHours))
     else
-      data + ( year -> (data(year) ++ List(monthHours)))
-    
+      data + (year -> (data(year) ++ List(monthHours)))
+
   }
 
   def printLine(sheet: Sheet, pos: Integer) = {

@@ -4,24 +4,23 @@ import jxl.{ Workbook, Sheet, Cell, CellType, DateCell, NumberCell, DateFormulaC
 import java.io.{ FileInputStream, File }
 import java.util.{ Calendar }
 import collection.JavaConversions._
-import collection.mutable._
+//import collection.mutable._
 import java.lang.reflect.{ Field }
-import sun.font.EAttribute
-import sun.font.EAttribute
+import sun.misc.Regexp
+
+//      println((0 to 20).toList.map( i => extractValues(doc.getSheet("Fevereiro").getCell(1,i))))
 
 object TimeSheetAglomerator {
 
   def main(args: Array[String]) = {
 
-    //      println((0 to 20).toList.map( i => extractValues(doc.getSheet("Fevereiro").getCell(1,i))))
-
     var data: Map[String, List[MonthHours]] = Map()
 
     for (file <- new File("excels").listFiles) {
 
-      val doc = Workbook.getWorkbook(file)
-
       println(file.getName())
+
+      val doc = Workbook.getWorkbook(file)
 
       if (!doc.getSheetNames().contains("TimeSheet")) {
 
@@ -37,17 +36,81 @@ object TimeSheetAglomerator {
         data = addMore(data, year, monthHours)
       }
     }
-    println(data)
 
+    
+//    println("2007: ")
+//
+//    data("2007").flatMap(_.projectshours).filter(_.projectName.equals("CC")).flatMap(_.activitieshours).groupBy(x => x._1).mapValues(x => x.map(y => y._2))
+//      .map { case (task, list) => (task, list.sum) }.foreach {
+//        println
+//     }
+//
+//    println("TUDO: ")
+//
+//    data.values.toList.reduce(_ ++ _).flatMap(_.projectshours).filter(_.projectName.equals("CC")).flatMap(_.activitieshours).groupBy(x => x._1).mapValues(x => x.map(y => y._2))
+//      .map { case (task, list) => (task, list.sum) }.foreach {
+//        println
+//     }
+      
+
+    println("SAF: ")
+
+    sumHoursPerActivity(filterByProjects(b("SAF"), getAll(data))).foreach {
+        println
+     }
+
+    println("IGCP: ")
+
+    sumHoursPerActivity(filterByProjects(b(".*IGCP.*|.*DGT.*"), getAll(data))).foreach {
+        println
+     }
+    
+    println("CC: ")
+    
+    sumHoursPerActivity(filterByProjects(b("CC.*"), getAll(data))).foreach {
+        println
+     }
+    
+    println("CNI: ")
+    
+    sumHoursPerActivity(filterByProjects(b("CNI.*"), getAll(data))).foreach {
+        println
+     }
+    	
   }
+  
+  def b(regexp:String)(proj: String): Boolean = {
+    var regex = regexp.r
+    regex.pattern.matcher(proj).matches
+  }
+
+  def getByYear(years: List[String], data: Map[String, List[MonthHours]]): List[MonthHours] = {
+    years.map(data(_)).reduce(_ ++ _)
+  }
+
+  def getAll(data: Map[String, List[MonthHours]]): List[MonthHours] = {
+    data.values.toList.reduce(_ ++ _)
+  }
+
+  def filterByProjects(f: String => Boolean, monthHours: List[MonthHours]): List[ProjectHours] = {
+    monthHours.flatMap(_.projectshours).filter{ it => f(it.projectName) }
+  }
+  
+  def sumHoursPerActivity(projecthours:List[ProjectHours]):Map[String,Double] = {
+    projecthours.flatMap(_.activitieshours).groupBy(x => x._1).mapValues(x => x.map(y => y._2))
+      .map { case (task, list) => (task, list.sum) }
+  }
+  
 
   def addMore(data: Map[String, List[MonthHours]], year: String, monthHours: MonthHours): Map[String, List[MonthHours]] = {
 
-    if (!data.contains(year))
+    if (!data.contains(year)) {
+      println("Novo ano : " + year + " Mês: " + monthHours.month)
       data + (year -> List(monthHours))
-    else
+    } else {
+      println("Adição de mês ao ano : " + year + " Mês: " + monthHours.month)
       data + (year -> (data(year) ++ List(monthHours)))
-
+    }
   }
 
   def printLine(sheet: Sheet, pos: Integer) = {
@@ -109,6 +172,7 @@ object TimeSheetAglomerator {
     var indexeslegend = List[IndexLegenda]()
     var i = 7
     do {
+      //println(extractValues(sheet.getCell(1, i)))
       val value = extractValues(sheet.getCell(1, i)).asInstanceOf[java.lang.String]
       indexeslegend = indexeslegend ::: List(new IndexLegenda(value = value, pos = i))
       i = i + 1

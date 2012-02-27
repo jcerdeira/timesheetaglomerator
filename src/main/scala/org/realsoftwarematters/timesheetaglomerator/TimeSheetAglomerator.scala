@@ -4,11 +4,8 @@ import jxl.{ Workbook, Sheet, Cell, CellType, DateCell, NumberCell, DateFormulaC
 import java.io.{ FileInputStream, File }
 import java.util.{ Calendar }
 import collection.JavaConversions._
-//import collection.mutable._
 import java.lang.reflect.{ Field }
 import sun.misc.Regexp
-
-//      println((0 to 20).toList.map( i => extractValues(doc.getSheet("Fevereiro").getCell(1,i))))
 
 object TimeSheetAglomerator {
 
@@ -36,22 +33,6 @@ object TimeSheetAglomerator {
         data = addMore(data, year, monthHours)
       }
     }
-
-    
-//    println("2007: ")
-//
-//    data("2007").flatMap(_.projectshours).filter(_.projectName.equals("CC")).flatMap(_.activitieshours).groupBy(x => x._1).mapValues(x => x.map(y => y._2))
-//      .map { case (task, list) => (task, list.sum) }.foreach {
-//        println
-//     }
-//
-//    println("TUDO: ")
-//
-//    data.values.toList.reduce(_ ++ _).flatMap(_.projectshours).filter(_.projectName.equals("CC")).flatMap(_.activitieshours).groupBy(x => x._1).mapValues(x => x.map(y => y._2))
-//      .map { case (task, list) => (task, list.sum) }.foreach {
-//        println
-//     }
-      
 
     println("SAF: ")
 
@@ -237,7 +218,6 @@ case class HeaderSheet(val month: String, val year: String) {
     getClass().getDeclaredFields().map { field: Field =>
       field.setAccessible(true)
       field.getName() + ": " + field.get(this).toString()
-      //println("coisa" + field.getName)
     }.mkString(",")
   }
 
@@ -249,7 +229,6 @@ case class IndexLegenda(val value: String, val pos: Integer) {
     getClass().getDeclaredFields().map { field: Field =>
       field.setAccessible(true)
       field.getName() + ": " + field.get(this).toString()
-      //println("coisa" + field.getName)
     }.mkString(",")
   }
 
